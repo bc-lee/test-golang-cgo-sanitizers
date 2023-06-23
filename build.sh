@@ -61,7 +61,7 @@ CFLAGS="--target=$TARGET_TRIPLE -nostdinc -isysroot $BASE_DIR/build/linux/debian
 
 # Additional flags for sanitizer
 if [[ "$SANITIZER" == "asan" ]]; then
-  CFLAGS="$CFLAGS -fsanitize=address"
+  CFLAGS="$CFLAGS -fsanitize=address -fsanitize=leak"
 elif [[ "$SANITIZER" == "msan" ]]; then
   CFLAGS="$CFLAGS -fsanitize=memory"
 else
@@ -70,11 +70,11 @@ fi
 
 pushd native || die "Failed to cd"
 rm -rf libfoo.a foo.o
-"$CC" -c -fPIC -o foo.o foo.c "$CFLAGS"
+"$CC" -c -fPIC ${CFLAGS} -o foo.o foo.c
 "$AR" rcs libfoo.a foo.o
 popd
 
-echo "Build a Go library for $SANITIZER on $OS/$ARCH"
+echo "Build a Go executable for $SANITIZER on $OS/$ARCH"
 export CC="$CC"
 
 export CGO_CFLAGS="$CFLAGS"
@@ -85,11 +85,9 @@ export CGO_LDFLAGS="-fuse-ld=lld --target=$TARGET_TRIPLE --sysroot $BASE_DIR/thi
 
 # Additional flags for sanitizer
 if [[ "$SANITIZER" == "asan" ]]; then
-  export CGO_CFLAGS="$CGO_CFLAGS -fsanitize=address -fsanitize=leak"
   export CGO_LDFLAGS="$CGO_LDFLAGS -fsanitize=address -fsanitize=leak \
   $BASE_DIR/third_party/llvm-build/Release+Asserts/lib/clang/17/lib/x86_64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
 elif [[ "$SANITIZER" == "msan" ]]; then
-  export CGO_CPPFLAGS="$CGO_CPPFLAGS -fsanitize=memory"
   export CGO_LDFLAGS="$CGO_LDFLAGS -fsanitize=memory \
     $BASE_DIR/third_party/llvm-build/Release+Asserts/lib/clang/17/lib/x86_64-unknown-linux-gnu/libclang_rt.msan.a \
     $BASE_DIR/third_party/llvm-build/Release+Asserts/lib/clang/17/lib/x86_64-unknown-linux-gnu/libclang_rt.msan_cxx.a"
@@ -112,7 +110,7 @@ fi
 
 export GODEBUG=cgocheck=2
 
-go build -o main ${ARGS} github.com/bc-lee/test-golang-cgo-sanitizers
+go build -o main -gcflags=all="-N -l" ${ARGS} github.com/bc-lee/test-golang-cgo-sanitizers
 
-echo "Run the Go binary"
-./main
+# echo "Run the Go binary"
+# ./main
